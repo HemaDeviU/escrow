@@ -14,6 +14,8 @@ function App() {
   const [escrows, setEscrows] = useState([]);
   const [account, setAccount] = useState();
   const [signer, setSigner] = useState();
+  const [contracts, setContracts] = useState();
+  const [escrowContracts, setEscrowContracts] = useState([]);
 
   useEffect(() => {
     async function getAccounts() {
@@ -28,38 +30,53 @@ function App() {
 
   async function newContract() {
     const beneficiary = document.getElementById('beneficiary').value;
-    const arbiter = document.getElementById('arbiter').value;
-    const value = ethers.BigNumber.from(document.getElementById('wei').value);
-    const escrowContract = await deploy(signer, arbiter, beneficiary, value);
+    const arbiter1 = document.getElementById('arbiter1').value;
+    const arbiter2 = document.getElementById('arbiter2').value;
 
+    const value = ethers.BigNumber.from(document.getElementById('wei').value);
+    const escrowContract = await deploy(signer, arbiter1, arbiter2, beneficiary, value);
+    setEscrowContracts([...escrowContracts, escrowContract]);
 
     const escrow = {
       address: escrowContract.address,
-      arbiter,
+      arbiter1,
+      arbiter2,
       beneficiary,
-      value: value.toString(),
-      handleApprove: async () => {
-        escrowContract.on('Approved', () => {
-          document.getElementById(escrowContract.address).className =
-            'complete';
-          document.getElementById(escrowContract.address).innerText =
-            "✓ It's been approved!";
-        });
-
-        await approve(escrowContract, signer);
-      },
+      value: document.getElementById('eth').value,
     };
-
-    setEscrows([...escrows, escrow]);
+    setEscrows([...escrows,escrow]);
+    await fetch('http://localhost:8000/escrows',{
+      method: 'POST',
+      body: JSON.stringify(escrow),
+      headers:{'Content-Type': 'application/json'}
+    });
   }
+  useEffect(() => {
+    async function getContracts(){
+      const res = await fetch('http://localhost:8000/escrows');
+      const contract = await res.json();
+      setContracts(contract);
+    }
+    getContracts();
+  },[]);
+  console.log("contracts:", contracts);
+  console.log("escrowcontracts:", escrowContracts);
+  console.log("escrows:",escrows);
+      
 
   return (
     <>
+    <div className='container'>
       <div className="contract">
         <h1> New Contract </h1>
         <label>
-          Arbiter Address
-          <input type="text" id="arbiter" />
+          Arbiter1 Address
+          <input type="text" id="arbiter1" />
+        </label>
+
+        <label>
+          Arbiter2 Address
+          <input type="text" id="arbiter2" />
         </label>
 
         <label>
@@ -68,8 +85,8 @@ function App() {
         </label>
 
         <label>
-          Deposit Amount (in Wei)
-          <input type="text" id="wei" />
+          Deposit Amount (in ETH)
+          <input type="text" id="eth" />
         </label>
 
         <div
@@ -89,10 +106,11 @@ function App() {
         <h1> Existing Contracts </h1>
 
         <div id="container">
-          {escrows.map((escrow) => {
-            return <Escrow key={escrow.address} {...escrow} />;
+          {contracts && contracts.map((contract) => {
+            return <Escrow key={contract.address} signer={signer}{...contract} />;
           })}
         </div>
+      </div>
       </div>
     </>
   );
